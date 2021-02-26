@@ -97,6 +97,8 @@ def main(plot_switch=False):
             ]
     
     # Construct the "NMPC simulator" object
+    # Main purpose is to construct `plant` and `controller`
+    # `DynamicBlock`s
     nmpc = NMPCSim(
             plant_model=m_plant,
             plant_time_set=m_plant.fs.time,
