@@ -386,6 +386,7 @@ class _DynamicBlockData(_BlockData):
         """
         strip_var_bounds = kwargs.pop('strip_var_bounds', True)
         input_option = kwargs.pop('input_option', InputOption.CURRENT)
+        solve_initial_conditions = kwargs.pop('solve_initial_conditions', False)
         config = self.CONFIG(kwargs)
         square_solve_context = SquareSolveContext(
                 self,
@@ -408,6 +409,7 @@ class _DynamicBlockData(_BlockData):
                     time_linking_vars=list(self.differential_vars[:]),
                     outlvl=config.outlvl,
                     solver=solver,
+                    solve_initial_conditions=solve_initial_conditions,
                     )
 
     def initialize_samples_by_element(self, samples, solver, **kwargs):
