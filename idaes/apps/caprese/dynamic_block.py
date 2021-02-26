@@ -54,6 +54,7 @@ from pyomo.core.base.indexed_component import UnindexedComponent_set
 from pyomo.common.collections import ComponentMap
 from pyomo.common.config import ConfigDict, ConfigValue
 from pyomo.core.base.range import remainder
+from pyomo.core.base.set import UnknownSetDimen
 from pyomo.dae.set_utils import deactivate_model_at
 from pyomo.dae.flatten import flatten_dae_components
 
@@ -209,6 +210,8 @@ class _DynamicBlockData(_BlockData):
             var_name = self._var_name
 
             # Get a slice of the block, e.g. self.DIFFERENTIAL_BLOCK[:]
+            if getattr(self, block_name).dim() is UnknownSetDimen:
+                continue
             _slice = getattr(self, block_name)[:]
             #_slice = self.__getattribute__(block_name)[:]
             # Why does this work when self.__getattr__(block_name) does not?
