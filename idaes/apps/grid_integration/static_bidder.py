@@ -546,25 +546,27 @@ class Static_Bidder:
         self.forecaster = forecaster
         self.ns = ns
 
-        # # get the generator name
+        # get the generator name
         self.generator = self.bidding_model_object.generator
         
-        # # create the static model and populate the model. 
-        # #We do not need blocks since we only need to create the optimization problem in one scenario.
+        # create the static model and populate the model. 
+        # We do not need blocks since we only need to create the optimization problem in one scenario.
         self.model_static = pyo.ConcreteModel()
         self.bidding_model_object.populate_model(self.model_static)
 
-        # # save power output variable in the model object
+        # save power output variable in the model object
         self.static_save_power_outputs()
 
         # formulate the static bidding problem
         self.static_formulate_bidding_problem()
 
+        # Create a list to store results
+        self.static_bids_result_list
 
     def static_save_power_outputs(self):
 
         """
-        Create references of the power output variable in each price scenario
+        Create references of the power output variable in the chosen price scenario
         block.
 
         Arguments:
@@ -583,7 +585,7 @@ class Static_Bidder:
 
         """
         Formulate the bidding optimization problem by adding necessary
-        parameters, constraints, and objective function.
+        parameters, constraints, and objective function. (with no constraints)
 
         Arguments:
             None
@@ -597,15 +599,18 @@ class Static_Bidder:
         self.static_add_bidding_objective()
 
 
-    def static_add_bidding_params(self):
-
-        time_index = self.model_static.power_output_ref.index_set()
-        self.model_static.energy_price = pyo.Param(time_index, initialize=0, mutable=True)
-
-        return
-
 
     def static_add_bidding_params(self):
+
+        '''
+        Add model parameters to the model, i.e., the price of the energy. 
+
+        Arguments:
+            None
+
+        Returns:
+            None
+        '''
 
         time_index = self.model_static.power_output_ref.index_set()
         self.model_static.energy_price = pyo.Param(time_index, initialize=0, mutable=True)
@@ -614,14 +619,20 @@ class Static_Bidder:
 
     # def static_add_bidding_constraints(self):
 
-    #     self.model.bidding_constraints = pyo.ConstraintList()
-    #     time_index = self.model.static.power_output_ref.index_set()
-    #     for t in time_index:
-    #         self.model.bidding_constraints.add((self.model_static.power_output_ref[t] - self.model_static.power_output_ref[t])
-    #                 * (self.model_static.energy_price[t] - self.model_static.energy_price[t]) >= 0)
     #     return 
 
     def static_add_bidding_objective(self):
+
+        '''
+        Add objective function to the model, i.e., maximizing the expected profit
+        of the energy system.
+
+        Arguments: 
+            None
+
+        Returns: 
+            None
+        '''
 
         self.model_static.obj = pyo.Objective(expr=0, sense=pyo.maximize)
 
@@ -638,6 +649,17 @@ class Static_Bidder:
 
     def static_pass_price_forecasts(self, price_forecast):
         
+        '''
+        Pass the price forecasts into model parameters.
+
+        Arguments:
+            The price_forecast is the price we choose for the optimization problem. 
+            Differ from the optimal bidding, we only use one price.
+
+        Returns:
+            None
+        '''
+
         time_index = self.model_static.energy_price.index_set()
         for t in time_index:
             self.model.static.energy_price[t] = price_forecast
@@ -646,24 +668,48 @@ class Static_Bidder:
 
     def compute_static_bids(self, date, hour=None, **kwargs):
         '''
-        create bidding optimization problem with 1 timestep and 1 scenario.
+        Solve bidding optimization problem with 1 timestep and 1 scenario repeatly with difference energy price.
 
         Arguments:
-            n: which scenario we are going to calculate the static bids
+            price_forecasts: price forecasts needed to solve the bidding problem. 
+
+            date: current simulation date
+
+            hour: current simulation hour
+        
+        Returns:
+            static_bids is a dictionary. Keys are the LMP price used in the static bidding. Values are the bids. 
+            The data structure should be like that in the optimal bidding problem.
 
         '''
 
         # price_forecasts has the prediction for 5 scenarios, we only need one of them.
         price_forecasts = self.forecaster.forecast(date=date, hour=hour, **kwargs)
 
-        bids_ = {}
+        static_bids = {}
         for i in price_forecasts[self.nc]:
             self.static_pass_price_forecasts(i)
             self.solver.solve(model_static)
             bids = self.static_assemble_bids()
-            bids_[i] = bids
+            static_bids_[i] = bids
+
+        return static_bids
+
+
 
     def static_assemble_bids(self):
+
+        """
+        This methods extract the bids out of the stochastic programming model and
+        organize them.
+
+        Arguments:
+            None
+
+        Returns:
+            bids: the bid we computed. It is a dictionary that has this structure. {t: {gen:{power: cost}}}.
+        """
+
         bids = {}
         gen = self.generator
 
@@ -720,3 +766,56 @@ class Static_Bidder:
                 pre_cost += marginal_cost * delta_p
 
         return bids
+
+    def static_record_bids(self, bids, date, hour):
+
+        """
+        This function records the bids we computed for the given date into a
+        DataFrame. This DataFrame has the following columns: gen, date, hour,
+        power 1, ..., power n, price 1, ..., price n. And concatenate the
+        DataFrame into a class property 'bids_result_list'.
+
+        Arguments:
+            bids: the obtained bids for this date.
+
+            date: the date we bid into
+
+            hour: the hour we bid into
+
+        Returns:
+            None
+
+        """
+
+        df_list = []
+        for t in bids:
+            for gen in bids[t]:
+
+                result_dict = {}
+                result_dict["Generator"] = gen
+                result_dict["Date"] = date
+                result_dict["Hour"] = t
+
+                pair_cnt = 0
+                for power, cost in bids[t][gen].items():
+                    result_dict["Power {} [MW]".format(pair_cnt)] = power
+                    result_dict["Cost {} [$]".format(pair_cnt)] = cost
+
+                    pair_cnt += 1
+
+                # place holder, in case different len of bids
+                while pair_cnt < self.n_scenario:
+
+                    result_dict["Power {} [MW]".format(pair_cnt)] = None
+                    result_dict["Cost {} [$]".format(pair_cnt)] = None
+
+                    pair_cnt += 1
+
+                result_df = pd.DataFrame.from_dict(result_dict, orient="index")
+                df_list.append(result_df.T)
+
+        # save the result to object property
+        # wait to be written when simulation ends
+        self.static_bids_result_list.append(pd.concat(df_list))
+
+        return
