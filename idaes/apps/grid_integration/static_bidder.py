@@ -202,6 +202,7 @@ class Bidder:
         Returns:
             None
         """
+        # if self.n_scenario > 1:
 
         # declare a constraint list
         self.model.bidding_constraints = pyo.ConstraintList()
@@ -271,7 +272,7 @@ class Bidder:
         Returns:
             None
         """
-
+        # write a simple forecaster
         price_forecasts = self.forecaster.forecast(date=date, hour=hour, **kwargs)
 
         # update the price forecasts
@@ -523,7 +524,7 @@ def compute_static_bids(self, bidding_model_objectives, lmp_prices):
 Questions are on the google doc
 '''
 
-class Static_Bidder:
+class StaticBidder:
     def __init__(self, bidding_model_object, solver, forecaster, ns):
      """
         Initializes the bidder object.
@@ -539,6 +540,8 @@ class Static_Bidder:
 
         Returns:
             None
+
+        tips: does not need forecaster and ns. Create the corresponding the optimal bidder obj with 1 time step and 1 scenario. 
     """
         # copy the inputs
         self.bidding_model_object = bidding_model_object
@@ -552,6 +555,10 @@ class Static_Bidder:
         # create the static model and populate the model. 
         # We do not need blocks since we only need to create the optimization problem in one scenario.
         self.model_static = pyo.ConcreteModel()
+
+        # For repeated solve, we can also use AbstractModel
+        # self.model_static = pyo.AbstractModel()
+
         self.bidding_model_object.populate_model(self.model_static)
 
         # save power output variable in the model object
@@ -612,8 +619,8 @@ class Static_Bidder:
             None
         '''
 
-        time_index = self.model_static.power_output_ref.index_set()
-        self.model_static.energy_price = pyo.Param(time_index, initialize=0, mutable=True)
+        # time_index = self.model_static.power_output_ref.index_set()
+        self.model_static.energy_price = pyo.Param(initialize=0, mutable=True)
 
         return
 
@@ -643,14 +650,14 @@ class Static_Bidder:
         weight = self.bidding_model_object.total_cost[1]
 
         for t in time_index:
-            self.model_static.obj.expr += (self.model_static.power_output_ref[t] * self.model_static.energy_price[t] - weight * cost[t])
+            self.model_static.obj.expr += (self.model_static.power_output_ref[t] * self.model_static.energy_price - weight * cost[t])
 
         return
 
-    def static_pass_price_forecasts(self, price_forecast):
+    # def static_pass_price_forecasts(self, price_forecast):
         
         '''
-        Pass the price forecasts into model parameters.
+        Set the price forecasts into model parameters.
 
         Arguments:
             The price_forecast is the price we choose for the optimization problem. 
@@ -660,13 +667,13 @@ class Static_Bidder:
             None
         '''
 
-        time_index = self.model_static.energy_price.index_set()
-        for t in time_index:
-            self.model.static.energy_price[t] = price_forecast
+        # time_index = self.model_static.energy_price.index_set()
+        # for t in time_index:
+        # self.model.static.energy_price = price_forecast
         
-        return
+        # return
 
-    def compute_static_bids(self, date, hour=None, **kwargs):
+    def static_compute_bids_con(self, date, hour=None, **kwargs):
         '''
         Solve bidding optimization problem with 1 timestep and 1 scenario repeatly with difference energy price.
 
@@ -688,13 +695,23 @@ class Static_Bidder:
 
         static_bids = {}
         for i in price_forecasts[self.nc]:
-            self.static_pass_price_forecasts(i)
+            self.model.static.energy_price = price_forecast
             self.solver.solve(model_static)
             bids = self.static_assemble_bids()
             static_bids_[i] = bids
 
         return static_bids
 
+    # def static_compute_bids_abs(self, date, hour=None, **kwargs):
+
+    #     static_bids = {}
+    #     for i in price_forecasts[self.nc]:
+    #         instance = self.model_static.create_instance()
+    #         instance.energy_price = i
+    #         self.solver.solve(instance)
+    #         bids = self.static_assemble_bids()
+    #         static_bids_[i] = bids
+    #     return static_bids
 
 
     def static_assemble_bids(self):

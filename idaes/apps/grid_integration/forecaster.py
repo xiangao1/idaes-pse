@@ -23,6 +23,20 @@ class PlaceHolderForecaster:
         return self.price_forecasts_df.loc[date].to_dict("list")
 
 
+# make a new class, 
+class StaticBiddingForecaster:
+    '''
+
+    '''
+    def __init__(self,price):
+        self.set_price(price)
+
+    def forecast(self, date, **kwargs):
+        return # correct data structure for static bidding.
+    def set_price(self,price):
+        self.price = price
+
+
 if __name__ == "__main__":
 
     price_forecasts_df = pd.read_csv("examples/lmp_forecasts_example.csv")
