@@ -1,10 +1,11 @@
 import pyomo.environ as pyo
 from collections import deque
 import pandas as pd
-from idaes.apps.grid_integration.tracker import Tracker
-from idaes.apps.grid_integration.bidder import Bidder
-from idaes.apps.grid_integration.forecaster import PlaceHolderForecaster
+from tracker import Tracker
+from static_bidder import Bidder
+from forecaster import PlaceHolderForecaster
 from prescient.simulator import Prescient
+import sys
 
 class ThermalGenerator:
 
@@ -517,11 +518,11 @@ if __name__ == "__main__":
     horizon = 4
 
     rts_gmlc_dataframe = pd.read_csv('gen.csv')
-    solver = pyo.SolverFactory('cbc')
+    solver = pyo.SolverFactory('gurobi')
 
     run_tracker = True
     run_bidder = True
-    run_prescient = True
+    run_prescient = False
 
     if run_tracker:
 
@@ -550,10 +551,14 @@ if __name__ == "__main__":
 
         # create forecaster
         price_forecasts_df = pd.read_csv('lmp_forecasts_concat.csv')
-        forecaster = PlaceHolderForecaster(price_forecasts_df = price_forecasts_df)
+
+        # Specify the number of scenarios, if ns == 1, it is static bidding
+        ns_ = sys.argv[1]
+        ns = int(ns_)
+        forecaster = PlaceHolderForecaster(price_forecasts_df = price_forecasts_df, n_scenario = ns)
 
         thermal_bidder = Bidder(bidding_model_object = bidding_model_object,\
-                                n_scenario = 10,\
+                                n_scenario = ns,\
                                 solver = solver,\
                                 forecaster = forecaster)
 
