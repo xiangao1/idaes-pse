@@ -1,0 +1,5 @@
+Generator,Date,Hour,Horizon [hr],Thermal Power Generated [MW],On/off [bin],Start Up [bin],Shut Down [bin],Production Cost [$],Start-up Cost [$],Total Cost [$],Mileage [MW]
+102_STEAM_3,2021-07-26,17:00,0,30.0,1,0,0,735.1,0.0,735.1,0.0
+102_STEAM_3,2021-07-26,17:00,1,40.0,1,0,0,919.73,0.0,919.73,10.0
+102_STEAM_3,2021-07-26,17:00,2,50.0,1,0,0,1115.49,0.0,1115.49,10.0
+102_STEAM_3,2021-07-26,17:00,3,70.0,1,0,0,1548.0,0.0,1548.0,20.0

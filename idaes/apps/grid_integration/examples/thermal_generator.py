@@ -1,10 +1,11 @@
 import pyomo.environ as pyo
 from collections import deque
 import pandas as pd
-from idaes.apps.grid_integration.tracker import Tracker
-from idaes.apps.grid_integration.bidder import Bidder
-from idaes.apps.grid_integration.forecaster import PlaceHolderForecaster
+from tracker import Tracker
+from static_bidder import Bidder
+from forecaster import PlaceHolderForecaster
 from prescient.simulator import Prescient
+import sys
 
 class ThermalGenerator:
 
@@ -517,11 +518,11 @@ if __name__ == "__main__":
     horizon = 4
 
     rts_gmlc_dataframe = pd.read_csv('gen.csv')
-    solver = pyo.SolverFactory('cbc')
+    solver = pyo.SolverFactory('gurobi')
 
     run_tracker = True
     run_bidder = True
-    run_prescient = True
+    run_prescient = False
 
     if run_tracker:
 
@@ -550,16 +551,39 @@ if __name__ == "__main__":
 
         # create forecaster
         price_forecasts_df = pd.read_csv('lmp_forecasts_concat.csv')
+
+        # Specify the number of scenarios.
+        ns_ = sys.argv[1]
+        ns = int(ns_)
+
+        # Specify the bid type (static or optimal, 's' = static, o = 'optimal')
+        bid_type = sys.argv[2]
+
+        if bid_type not in ('s','o'):
+            raise Exception("Argument 2 must be \'s\' or \'o\'.")
+
+        if (ns != 1 and bid_type == 's'):
+            raise Exception('Static biding should only have 1 scenario.')
+
         forecaster = PlaceHolderForecaster(price_forecasts_df = price_forecasts_df)
 
         thermal_bidder = Bidder(bidding_model_object = bidding_model_object,\
-                                n_scenario = 10,\
+                                n_scenario = ns,\
                                 solver = solver,\
-                                forecaster = forecaster)
+                                forecaster = forecaster,\
+                                bid_type = bid_type)
 
         date = "2020-07-10"
         hour = "13:00"
-        bids = thermal_bidder.compute_bids(date, hour)
+        static_lmp = [22,22.5,23,24]
+        
+        if bid_type == 'o':
+            static_bid = False
+            bids = thermal_bidder.compute_bids(date, hour)
+        else:
+            static_bid = True
+            bids = thermal_bidder.compute_static_bids(static_lmp,date,hour)            
+
         thermal_bidder.write_results(path = './')
 
     if run_prescient:
