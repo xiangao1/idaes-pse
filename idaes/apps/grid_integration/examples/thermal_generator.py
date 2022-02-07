@@ -552,19 +552,38 @@ if __name__ == "__main__":
         # create forecaster
         price_forecasts_df = pd.read_csv('lmp_forecasts_concat.csv')
 
-        # Specify the number of scenarios, if ns == 1, it is static bidding
+        # Specify the number of scenarios.
         ns_ = sys.argv[1]
         ns = int(ns_)
-        forecaster = PlaceHolderForecaster(price_forecasts_df = price_forecasts_df, n_scenario = ns)
+
+        # Specify the bid type (static or optimal, 's' = static, o = 'optimal')
+        bid_type = sys.argv[2]
+
+        if bid_type not in ('s','o'):
+            raise Exception("Argument 2 must be \'s\' or \'o\'.")
+
+        if (ns != 1 and bid_type == 's'):
+            raise Exception('Static biding should only have 1 scenario.')
+
+        forecaster = PlaceHolderForecaster(price_forecasts_df = price_forecasts_df)
 
         thermal_bidder = Bidder(bidding_model_object = bidding_model_object,\
                                 n_scenario = ns,\
                                 solver = solver,\
-                                forecaster = forecaster)
+                                forecaster = forecaster,\
+                                bid_type = bid_type)
 
         date = "2020-07-10"
         hour = "13:00"
-        bids = thermal_bidder.compute_bids(date, hour)
+        static_lmp = [22,22.5,23,24]
+        
+        if bid_type == 'o':
+            static_bid = False
+            bids = thermal_bidder.compute_bids(date, hour)
+        else:
+            static_bid = True
+            bids = thermal_bidder.compute_static_bids(static_lmp,date,hour)            
+
         thermal_bidder.write_results(path = './')
 
     if run_prescient:

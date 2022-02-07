@@ -7,9 +7,8 @@ class PlaceHolderForecaster:
     manipulate the forecasts in a dataframe and feed to the bidder.
     """
 
-    def __init__(self, price_forecasts_df, n_scenario):
+    def __init__(self, price_forecasts_df):
         self.price_forecasts_df = price_forecasts_df
-        self.ns = n_scenario
         self.price_forecasts_df.set_index(["Date", "Hour"], inplace=True)
         self._rename_columns()
 
@@ -21,13 +20,8 @@ class PlaceHolderForecaster:
         return
 
     def forecast(self, date, **kwargs):
-        if self.ns == 1:
-            data = str(date)
-            return self.price_forecasts_df.loc[date].to_dict("list")[0]
-
-        else:    
-            date = str(date)
-            return self.price_forecasts_df.loc[date].to_dict("list")
+        date = str(date)
+        return self.price_forecasts_df.loc[date].to_dict("list")
 
 
 
