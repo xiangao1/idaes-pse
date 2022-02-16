@@ -277,19 +277,6 @@ class Bidder:
         """
         # write a simple forecaster
         # move the static_bids out. Do not need to specify n_scenario == 1. 
-
-        # if self.n_scenario == 1:
-        #     static_bids = {}
-        #     price_forecasts = self.forecaster.forecast(date=date, hour=hour, **kwargs)
-        #     for price in price_forecasts:
-        #         self.static_pass_price_forecasts(price)
-        #         self.solver.solve(self.model, tee=True)
-        #         bids = self._assemble_bids()
-        #         self.record_bids(bids, date=date, hour=hour)
-        #         static_bids[price] = bids
-
-        #     return static_bids
-
         # make it an independent function compute_static_bids(self, lmp) 
 
         price_forecasts = self.forecaster.forecast(date=date, hour=hour, **kwargs)
@@ -304,16 +291,30 @@ class Bidder:
 
 
     def compute_static_bids(self,lmp,date,hour):
+        '''
+        Solve the static bidding problem.
+
+        Arguments:
+            lmp: the local marginal price that we want to use to calculate static bids.
+
+            date: current simulation date
+
+            hour: current simulation hour
+
+        Returns:
+            The bid results
+
+        '''
 
         if not isinstance(lmp,list):
-            raise RuntimeError(
+            raise AttributeError(
                 f"Argument 'lmp' should be a list")
 
         for price in lmp:
             self.static_pass_price_forecasts(price)
             self.solver.solve(self.model, tee=True)
-            bids = self.static_assemble_record_bids(date)
-            # self.record_bids(bids, date=date, hour=hour)
+            bids = self._assemble_bids()
+            self.record_bids(bids, date=date, hour=hour)
 
         return bids
 
@@ -378,32 +379,6 @@ class Bidder:
 
         return
 
-    def static_assemble_record_bids(self,date):
-        bids = {}
-        gen = self.generator
-        for i in self.model.SCENARIOS:
-            time_index = self.model.fs[i].energy_price.index_set()
-            for t in time_index:
-                bids[t] = {}
-                bids[t][gen] = {}
-                power = round(pyo.value(self.model.fs[i].power_output_ref[t]), 2)
-                marginal_cost = round(pyo.value(self.model.fs[i].energy_price[t]), 2)
-                bids[t][gen][power] = marginal_cost
-                if True:
-                    break
-        df_list = []
-        for t in bids:
-            for gen in bids[t]:
-                result_dict = {}
-                result_dict["Generator"] = gen
-                result_dict["Date"] = date
-                result_dict["LMP"] = bids[t][gen][power]
-                result_dict["Power"] = power
-                result_df = pd.DataFrame.from_dict(result_dict, orient="index")
-                df_list.append(result_df.T)
-        self.bids_result_list.append(pd.concat(df_list))
-
-
 
     def _assemble_bids(self):
 
@@ -430,17 +405,23 @@ class Bidder:
                     bids[t][gen] = {}
 
                 power = round(pyo.value(self.model.fs[i].power_output_ref[t]), 2)
+                print(power)
                 marginal_cost = round(pyo.value(self.model.fs[i].energy_price[t]), 2)
 
                 if power < self.bidding_model_object.pmin:
-                    continue
+                    if self.bid_type == 's':
+                        power = self.bidding_model_object.pmin
+                        bids[t][gen][power] = marginal_cost
+                        break
+                    else:
+                        continue
                 elif power in bids[t][gen]:
                     bids[t][gen][power] = min(bids[t][gen][power], marginal_cost)
                 else:
                     bids[t][gen][power] = marginal_cost
 
-                # if self.bid_type == 's':
-                #     break
+                if self.bid_type == 's':
+                    break
 
         for t in time_index:
 
@@ -475,8 +456,8 @@ class Bidder:
                 pre_power = power
                 pre_cost += marginal_cost * delta_p
 
-            # if self.bid_type == 's':
-            #     break
+            if self.bid_type == 's':
+                break
 
         print(self.bidding_model_object.default_bids.items())
         # check if bids are convex
@@ -574,14 +555,9 @@ class Bidder:
 
                     pair_cnt += 1
 
-                # if self.bid_type == 's':
-                #     result_dict["LMP"] = self.static_price
-
                 result_df = pd.DataFrame.from_dict(result_dict, orient="index")
                 df_list.append(result_df.T)
 
-            # if self.bid_type == 's':
-            #     break
         # save the result to object property
         # wait to be written when simulation ends
         self.bids_result_list.append(pd.concat(df_list))

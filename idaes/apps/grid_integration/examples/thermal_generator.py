@@ -575,7 +575,8 @@ if __name__ == "__main__":
 
         date = "2020-07-10"
         hour = "13:00"
-        static_lmp = [22,22.5,23,24]
+        # 
+        static_lmp = [5,10,15,30]
         
         if bid_type == 'o':
             static_bid = False
