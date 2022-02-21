@@ -405,9 +405,10 @@ class Bidder:
                     bids[t][gen] = {}
 
                 power = round(pyo.value(self.model.fs[i].power_output_ref[t]), 2)
-                print(power)
+                # print(power)
                 marginal_cost = round(pyo.value(self.model.fs[i].energy_price[t]), 2)
 
+                # If the output is 0, we want the generator keep a minimun output, pmin.
                 if power < self.bidding_model_object.pmin:
                     if self.bid_type == 's':
                         power = self.bidding_model_object.pmin
@@ -420,6 +421,7 @@ class Bidder:
                 else:
                     bids[t][gen][power] = marginal_cost
 
+                # At static bidding, the power results are same for all time spans. So we only need to record once. 
                 if self.bid_type == 's':
                     break
 
@@ -456,6 +458,7 @@ class Bidder:
                 pre_power = power
                 pre_cost += marginal_cost * delta_p
 
+            # At static bidding, the power results are same for all time spans. So we only need to record once. 
             if self.bid_type == 's':
                 break
 
