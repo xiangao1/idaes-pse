@@ -178,7 +178,10 @@ class Tracker:
             self.time_set, initialize=0, within=pyo.Reals, mutable=True
         )
 
-        self.model.deviation_penalty = pyo.Param(initialize=10000, mutable=False)
+        self.model.market_prices = pyo.Param(
+            self.time_set, initialize=0, within=pyo.Reals, mutable=True
+        )
+
         return
 
     def _add_tracking_constraints(self):
@@ -241,13 +244,13 @@ class Tracker:
         weight = self.tracking_model_object.total_cost[1]
 
         for t in self.time_set:
-            self.model.obj.expr += weight * cost[t] + self.model.deviation_penalty * (
+            self.model.obj.expr += weight * cost[t] + self.model.market_prices[t] * (
                 self.model.power_underdelivered[t] + self.model.power_overdelivered[t]
             )
 
         return
 
-    def track_market_dispatch(self, market_dispatch, date, hour):
+    def track_market_dispatch(self, market_dispatch, market_prices, date, hour):
 
         """
         Solve the model to track the market dispatch signals. After solving,
@@ -265,9 +268,28 @@ class Tracker:
         """
 
         self._pass_market_dispatch(market_dispatch)
+        self._pass_market_prices(market_prices)
+
+        # print(f"Date {date}, Hour {hour}, Market dispatch {market_dispatch}")
+        # print(
+        #     f"Date {date}, Hour {hour}, Wind power UB {[pyo.value(blk.fs.windpower.capacity_factor[0] * blk.fs.windpower.system_capacity * 1e-3) for blk in self.model.fs.windBattery.get_active_process_blocks()]}"
+        # )
 
         # solve the model
         self.solver.solve(self.model, tee=True)
+
+        # print(
+        #     f"Date {date}, Hour {hour}, Power output {[pyo.value(self.power_output[t]) for t in self.time_set]}"
+        # )
+        # print(
+        #     f"Date {date}, Hour {hour}, Battery output {[pyo.value(blk.fs.battery.elec_out[0] * 1e-3) for blk in self.model.fs.windBattery.get_active_process_blocks()]}"
+        # )
+        # print(
+        #     f"Date {date}, Hour {hour}, Battery SOC {[pyo.value(blk.fs.battery.state_of_charge[0] * 1e-3) for blk in self.model.fs.windBattery.get_active_process_blocks()]}"
+        # )
+
+        # for idx, blk in enumerate(self.model.fs.windBattery.get_active_process_blocks()):
+        #     print(f"Hour {idx}, battery log: {blk.fs.battery.display()}")
 
         self.record_results(date=date, hour=hour)
 
@@ -317,6 +339,23 @@ class Tracker:
 
         for t, dipsatch in zip(self.time_set, market_dispatch):
             self.model.power_dispatch[t] = dipsatch
+
+        return
+
+    def _pass_market_prices(self, market_prices):
+
+        """
+        Pass the received market signals into model parameters.
+
+        Arguments:
+            market_prices: a list that contains the market prices signals.
+
+        Returns:
+            None
+        """
+
+        for t, price in zip(self.time_set, market_prices):
+            self.model.market_prices[t] = price
 
         return
 
