@@ -375,6 +375,7 @@ class DoubleLoopCoordinator:
         current_hour = simulator.time_manager.current_time.hour
 
         self._clone_tracking_model()
+        dummy_price_signals = [options.price_threshold] * options.sced_horizon
 
         for hour in range(ruc_hour, 24):
 
@@ -384,7 +385,10 @@ class DoubleLoopCoordinator:
             )
             # solve tracking
             self.projection_tracker.track_market_dispatch(
-                market_dispatch=market_signals, date=current_date, hour=current_hour
+                market_dispatch=market_signals,
+                market_prices=dummy_price_signals,
+                date=current_date,
+                hour=current_hour,
             )
 
         # merge the trajectory
@@ -508,7 +512,7 @@ class DoubleLoopCoordinator:
         # updated p_cost, so delete p_fuel
         if "p_fuel" in gen_dict:
             gen_dict.pop("p_fuel")
-            
+
         return
 
     def _pass_RT_schedule_to_prescient(
@@ -639,6 +643,57 @@ class DoubleLoopCoordinator:
 
         return market_signals
 
+    def assemble_sced_price_signals(self, options, simulator, lmp_sced, hour):
+
+        """
+        This function assembles the LMP signals for the tracking model.
+
+        Arguments:
+            options: Prescient options.
+
+            simulator: Prescient simulator.
+
+            lmp_sced: Prescient SCED LMP object
+
+            hour: the simulation hour.
+
+        Returns:
+            price_signals: the price signals.
+        """
+
+        price_signals = []
+
+        # find bus: assuming RTS-GMLC data
+        cur_bus_id = self.bidder.generator[:3]
+        cur_bus_name = None
+        for bus_name, bus_info in lmp_sced.data["elements"]["bus"].items():
+            if cur_bus_id == bus_info["id"]:
+                cur_bus_name = bus_name
+                break
+
+        if cur_bus_name is None:
+            raise RuntimeError(f"Bus ID {cur_bus_id} cannot be found.")
+
+        # find the current sced price signal
+        price_signals.append(
+            lmp_sced.data["elements"]["bus"][cur_bus_name]["lmp"]["values"][0]
+        )
+
+        # find the other ruc price signal
+        next_ruc_data = simulator.data_manager.ruc_market_pending
+        cur_ruc_data = simulator.data_manager.ruc_market_active
+        for t in range(hour + 1, hour + options.sced_horizon):
+            if t > 23 and next_ruc_data:
+                price_signals.append(
+                    round(next_ruc_data.day_ahead_prices[(cur_bus_name, t % 24)], 4)
+                )
+            else:
+                price_signals.append(
+                    round(cur_ruc_data.day_ahead_prices[(cur_bus_name, t)], 4)
+                )
+
+        return price_signals
+
     def track_sced_signal(self, options, simulator, sced_instance, lmp_sced):
 
         """
@@ -670,9 +725,16 @@ class DoubleLoopCoordinator:
             hour=current_hour,
         )
 
+        market_prices = self.assemble_sced_price_signals(
+            options=options, simulator=simulator, lmp_sced=lmp_sced, hour=current_hour
+        )
+
         # actual tracking
         self.tracker.track_market_dispatch(
-            market_dispatch=market_signals, date=current_date, hour=current_hour
+            market_dispatch=market_signals,
+            market_prices=market_prices,
+            date=current_date,
+            hour=current_hour,
         )
 
         return
