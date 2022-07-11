@@ -675,11 +675,11 @@ class StochasticProgramBidder(AbstractBidder):
                 except IndexError as ex:
                     self.real_time_model.fs[s].day_ahead_power[t].unfix()
                     # unrelax the DA offering UB
-                    self.real_time_model.fs[s].real_time_underbid_power.fix(0)
+                    self.real_time_model.fs[s].real_time_underbid_power[t].fix(0)
                 else:
                     self.real_time_model.fs[s].day_ahead_power[t].fix(dispatch)
                     # relax the DA offering UB
-                    self.real_time_model.fs[s].real_time_underbid_power.unfix()
+                    self.real_time_model.fs[s].real_time_underbid_power[t].unfix()
 
     def update_day_ahead_model(self, **kwargs):
 
