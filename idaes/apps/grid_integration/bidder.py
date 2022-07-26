@@ -405,7 +405,7 @@ class StochasticProgramBidder(AbstractBidder):
                 time_index, initialize=0, mutable=True
             )
             model.fs[i].real_time_underbid_penalty = pyo.Param(
-                initialize=600, mutable=True
+                initialize=10000, mutable=True
             )
 
         return
