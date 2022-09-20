@@ -256,6 +256,7 @@ class StochasticProgramBidder(AbstractBidder):
         n_scenario,
         solver,
         forecaster,
+        real_time_underbid_penalty,
     ):
 
         """
@@ -284,6 +285,7 @@ class StochasticProgramBidder(AbstractBidder):
         self.n_scenario = n_scenario
         self.solver = solver
         self.forecaster = forecaster
+        self.real_time_underbid_penalty = real_time_underbid_penalty
 
         self._check_inputs()
 
@@ -405,7 +407,7 @@ class StochasticProgramBidder(AbstractBidder):
                 time_index, initialize=0, mutable=True
             )
             model.fs[i].real_time_underbid_penalty = pyo.Param(
-                initialize=10000, mutable=True
+                initialize=self.real_time_underbid_penalty, mutable=True
             )
 
         return
@@ -832,6 +834,7 @@ class SelfScheduler(StochasticProgramBidder):
         n_scenario,
         solver,
         forecaster,
+        real_time_underbid_penalty=10000,
         fixed_to_schedule=False,
     ):
         """
@@ -863,6 +866,7 @@ class SelfScheduler(StochasticProgramBidder):
             n_scenario,
             solver,
             forecaster,
+            real_time_underbid_penalty,
         )
         self.fixed_to_schedule = fixed_to_schedule
 
@@ -1053,6 +1057,7 @@ class Bidder(StochasticProgramBidder):
         n_scenario,
         solver,
         forecaster,
+        real_time_underbid_penalty=10000,
     ):
 
         """
@@ -1082,6 +1087,7 @@ class Bidder(StochasticProgramBidder):
             n_scenario,
             solver,
             forecaster,
+            real_time_underbid_penalty,
         )
 
     def _add_DA_bidding_constraints(self, model):
